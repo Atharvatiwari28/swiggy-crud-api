@@ -55,7 +55,7 @@ Supports full CRUD operations with input validation and secure database queries.
 
 **1. Clone the repo**
 ```bash
-git clone https://github.com/YOUR_USERNAME/swiggy-crud-api.git
+git clone https://github.com/Atharvatiwari28/swiggy-crud-api.git
 cd swiggy-crud-api
 ```
 
