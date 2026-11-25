@@ -1,14 +1,13 @@
 import os
-from dotenv import load_dotenv
-
-from fastapi import FastAPI, HTTPException
-
 import psycopg
-
-import os
 from dotenv import load_dotenv
+from groq import Groq
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 
-load_dotenv()
+load_dotenv()                                          # 1. 📖 pehle .env padho
+
+ai_client = Groq(api_key=os.getenv("GROQ_API_KEY"))    # 2. 🔑 phir key use karo
 
 app = FastAPI()
 
@@ -121,7 +120,65 @@ def delete_customer(customer_id: int):
         raise HTTPException(status_code=404, detail="Customer nahi mila ❌")
 
     return {"message": f"Customer {customer_id} delete ho gaya 🗑️"}
+
+
+
+@app.get("/customers/{customer_id}/welcome")
+def welcome_customer(customer_id: int):
+    # 1. 🐘 Database se customer nikaalo
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT naam, city FROM customers WHERE id = %s",
+        (customer_id,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+
+    if row is None:
+        raise HTTPException(status_code=404, detail="Customer nahi mila ❌")
+
+    naam, city = row
+
+    # 2. 🤖 AI se message likhwao
+    response = ai_client.chat.completions.create(
+        model="openai/gpt-oss-120b",
+        messages=[
+            {"role": "system", "content": "Tum ek food delivery app ke friendly assistant ho. Hinglish mein, 2 line ka chhota welcome message likho. Customer ki city ka koi famous khana zaroor mention karo."},
+            {"role": "user", "content": f"Customer ka naam: {naam}. City: {city}."}
+        ],
+        temperature=0.1
+    )
+    message = response.choices[0].message.content
+
+    # 3. 🚀 Jawab bhejo
+    return {"customer": naam, "city": city, "message": message}
         
         
-    
-    
+@app.get("/customers/{customer_id}/suggestion")
+def suggest_customer(customer_id: int):
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT naam, city FROM customers WHERE id = %s",
+        (customer_id,)
+    )
+    row = cursor.fetchone()
+    conn.close()
+
+    if row is None:
+        raise HTTPException(status_code=404, detail="Customer not found")
+
+    naam, city = row
+
+    response = ai_client.chat.completions.create(
+        model="openai/gpt-oss-120b",
+        messages=[
+            {"role": "system", "content": "You are a food suggestion app. According to the customer's city, suggest 3 famous food items. Reply in Hinglish. give only the names of food items"},
+            {"role": "user", "content": f"Customer ka naam: {naam}. City: {city}."}
+        ],
+        temperature=0.1
+    )
+    message = response.choices[0].message.content
+
+    return {"customer": naam, "city": city, "suggestions": message}
